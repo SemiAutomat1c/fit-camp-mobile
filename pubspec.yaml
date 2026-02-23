@@ -1,0 +1,44 @@
+name: fit_camp_mobile
+description: "24 Fit Camp - Gym Management Mobile App for Members and Trainers"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  convex_flutter: ^3.0.0
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.0.0
+  image_picker: ^1.0.7
+  intl: ^0.19.0
+  cached_network_image: ^3.3.1
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Uncomment when assets are ready:
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
+
+  # Uncomment when fonts are added:
+  # fonts:
+  #   - family: Poppins
+  #     fonts:
+  #       - asset: assets/fonts/Poppins-Regular.ttf
+  #       - asset: assets/fonts/Poppins-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Poppins-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Poppins-Bold.ttf
+  #         weight: 700
