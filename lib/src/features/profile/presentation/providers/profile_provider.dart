@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/services/convex_provider.dart';
@@ -11,7 +10,7 @@ part 'profile_provider.g.dart';
 ///
 /// Returns `null` if no profile has been created yet (pre-onboarding state).
 @riverpod
-Future<Map<String, dynamic>?> myProfile(Ref ref) async {
+Future<Map<String, dynamic>?> myProfile(MyProfileRef ref) async {
   final client = ref.watch(convexClientProvider);
   final raw = await client.query('mobile:getMyProfile', {});
   if (raw == 'null') return null;
@@ -22,7 +21,7 @@ Future<Map<String, dynamic>?> myProfile(Ref ref) async {
 ///
 /// Returns `null` if there is no active subscription on record.
 @riverpod
-Future<Map<String, dynamic>?> mySubscription(Ref ref) async {
+Future<Map<String, dynamic>?> mySubscription(MySubscriptionRef ref) async {
   final client = ref.watch(convexClientProvider);
   final raw = await client.query('mobile:getMySubscription', {});
   if (raw == 'null') return null;

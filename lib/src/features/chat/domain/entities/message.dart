@@ -10,6 +10,8 @@ class Message {
     required this.createdAt,
     this.isPending = false,
     this.isFailed = false,
+    this.storageId,
+    this.imageUrl,
   });
 
   final String id;
@@ -22,6 +24,12 @@ class Message {
   final DateTime createdAt;
   final bool isPending;
   final bool isFailed;
+
+  /// Convex storage ID for an image attached to this message.
+  final String? storageId;
+
+  /// Resolved CDN URL for the attached image (populated by the backend).
+  final String? imageUrl;
 
   factory Message.fromJson(Map<String, dynamic> json) {
     final sender = json['sender'] as Map<String, dynamic>?;
@@ -37,10 +45,17 @@ class Message {
           : null,
       createdAt: DateTime.fromMillisecondsSinceEpoch(
           (json['createdAt'] as num).toInt()),
+      storageId: json['storageId'] as String?,
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 
-  Message copyWith({bool? isPending, bool? isFailed}) {
+  Message copyWith({
+    bool? isPending,
+    bool? isFailed,
+    String? storageId,
+    String? imageUrl,
+  }) {
     return Message(
       id: id,
       conversationId: conversationId,
@@ -52,6 +67,8 @@ class Message {
       createdAt: createdAt,
       isPending: isPending ?? this.isPending,
       isFailed: isFailed ?? this.isFailed,
+      storageId: storageId ?? this.storageId,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

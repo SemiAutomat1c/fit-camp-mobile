@@ -4,23 +4,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/models/app_user.dart';
 import '../../core/services/convex_provider.dart';
+import '../../features/chat/presentation/providers/chat_provider.dart';
 import '../../features/notifications/presentation/widgets/notification_bell.dart';
 import '../theme/app_colors.dart';
 import 'connectivity_banner.dart';
 
 // ---------------------------------------------------------------------------
-// Role provider
+// Role provider (re-exported from convex_provider for backward compat)
 // ---------------------------------------------------------------------------
 
-/// Provides the user's [AppUserRole] read from [storageServiceProvider].
-///
-/// Defaults to [AppUserRole.member] if no role is stored yet.
-final _roleProvider = FutureProvider<AppUserRole>((ref) async {
-  final storage = ref.watch(storageServiceProvider);
-  final stored = await storage.getRole();
-  if (stored == null) return AppUserRole.member;
-  return AppUserRole.fromString(stored);
-});
+// _roleProvider is an alias so the rest of this file compiles unchanged.
+final _roleProvider = userRoleProvider;
 
 // ---------------------------------------------------------------------------
 // Tab configuration
@@ -60,13 +54,27 @@ const List<IconData> _tabIconsOutlined = [
   Icons.trending_up,
 ];
 
-const List<String> _tabRoutes = [
+const List<String> _memberTabRoutes = [
   '/home',
   '/booking',
   '/chat',
   '/training',
   '/progress',
 ];
+
+const List<String> _trainerTabRoutes = [
+  '/clients',
+  '/booking',
+  '/chat',
+  '/training',
+  '/progress',
+];
+
+List<String> _getTabRoutes(bool isTrainer) =>
+    isTrainer ? _trainerTabRoutes : _memberTabRoutes;
+
+// Chat tab is at index 2.
+const int _chatTabIndex = 2;
 
 // ---------------------------------------------------------------------------
 // MainScaffold
@@ -90,15 +98,15 @@ class MainScaffold extends ConsumerStatefulWidget {
 class _MainScaffoldState extends ConsumerState<MainScaffold> {
   int _currentIndex = 0;
 
-  void _onTabTapped(int index) {
+  void _onTabTapped(int index, List<String> tabRoutes) {
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
-    context.go(_tabRoutes[index]);
+    context.go(tabRoutes[index]);
   }
 
-  int _indexFromRoute(String location) {
-    for (int i = 0; i < _tabRoutes.length; i++) {
-      if (location.startsWith(_tabRoutes[i])) return i;
+  int _indexFromRoute(String location, List<String> tabRoutes) {
+    for (int i = 0; i < tabRoutes.length; i++) {
+      if (location.startsWith(tabRoutes[i])) return i;
     }
     return 0;
   }
@@ -109,9 +117,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final isTrainer = roleAsync.valueOrNull == AppUserRole.trainer ||
         roleAsync.valueOrNull == AppUserRole.admin;
     final labels = isTrainer ? _trainerLabels : _memberLabels;
+    final tabRoutes = _getTabRoutes(isTrainer);
+
+    // Unread badge — watch value; fallback to 0 while loading/errored.
+    final unreadCount =
+        ref.watch(unreadChatCountProvider).valueOrNull ?? 0;
 
     final location = GoRouterState.of(context).matchedLocation;
-    final activeIndex = _indexFromRoute(location);
+    final activeIndex = _indexFromRoute(location, tabRoutes);
     if (activeIndex != _currentIndex) {
       // Sync index when navigating programmatically (e.g. deep link).
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -124,7 +137,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         backgroundColor: AppColors.background,
         automaticallyImplyLeading: false,
         title: Text(
-          isTrainer ? _trainerLabels[_currentIndex] : _memberLabels[_currentIndex],
+          isTrainer
+              ? _trainerLabels[_currentIndex]
+              : _memberLabels[_currentIndex],
         ),
         actions: [
           const NotificationBell(),
@@ -143,9 +158,22 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             const ConnectivityBanner(),
             Expanded(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) =>
-                    FadeTransition(opacity: animation, child: child),
+                duration: const Duration(milliseconds: 180),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.02),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOut,
+                      )),
+                      child: child,
+                    ),
+                  );
+                },
                 child: KeyedSubtree(
                   key: ValueKey<int>(_currentIndex),
                   child: widget.child,
@@ -157,28 +185,53 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: _onTabTapped,
+        onDestinationSelected: (index) => _onTabTapped(index, tabRoutes),
         destinations: List.generate(
           _tabIconsFilled.length,
-          (i) => NavigationDestination(
-            icon: Icon(_tabIconsOutlined[i]),
-            selectedIcon: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_tabIconsFilled[i]),
-                const SizedBox(height: 2),
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+          (i) {
+            // Build the inactive icon — wrap in Badge for chat tab.
+            final outlinedIcon = Icon(_tabIconsOutlined[i]);
+            final inactiveIcon = (i == _chatTabIndex && unreadCount > 0)
+                ? Badge(
+                    label: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                    ),
+                    child: outlinedIcon,
+                  )
+                : outlinedIcon;
+
+            return NavigationDestination(
+              icon: inactiveIcon,
+              selectedIcon: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_tabIconsFilled[i]),
+                  const SizedBox(height: 2),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 200),
+                    builder: (_, v, child) =>
+                        Transform.scale(scale: v, child: child),
+                    child: Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withAlpha(120),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            label: labels[i],
-          ),
+                ],
+              ),
+              label: labels[i],
+            );
+          },
         ),
       ),
     );

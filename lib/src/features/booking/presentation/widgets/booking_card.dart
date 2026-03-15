@@ -4,8 +4,17 @@ import 'package:intl/intl.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_avatar.dart';
 import '../../domain/entities/booking.dart';
 
+/// Booking card with a prominent date block on the left (replaces thin bar).
+///
+/// Shows:
+/// - Date block (day number + month label) in accent color
+/// - Trainer avatar + name
+/// - Date string + time range
+/// - Status badge
+/// - Optional notes
 class BookingCard extends StatelessWidget {
   const BookingCard({
     super.key,
@@ -20,7 +29,8 @@ class BookingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = _statusColor(booking.status);
     final statusLabel = _statusLabel(booking.status);
-    final dateStr = DateFormat('EEE, MMM d').format(booking.date);
+    final dayStr = DateFormat('d').format(booking.date);
+    final monthStr = DateFormat('MMM').format(booking.date).toUpperCase();
     final timeStr =
         '${formatTime(booking.startTime)} – ${formatTime(booking.endTime)}';
 
@@ -32,35 +42,68 @@ class BookingCard extends StatelessWidget {
           borderRadius: const BorderRadius.all(Radius.circular(16)),
           border: Border.all(color: AppColors.border, width: 1),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _StatusIndicator(color: statusColor),
+            // Date block — mirrors calendar app conventions
+            Container(
+              width: 52,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: statusColor.withAlpha(20),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: statusColor.withAlpha(60), width: 1),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    dayStr,
+                    style: AppTextStyles.heading2.copyWith(
+                      color: statusColor,
+                      height: 1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    monthStr,
+                    style: AppTextStyles.label.copyWith(
+                      color: statusColor,
+                      fontSize: 11,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(width: 12),
+            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Trainer row with avatar
                   Row(
                     children: [
+                      AppAvatar(
+                        name: booking.trainerName ?? 'Trainer',
+                        size: AppAvatarSize.sm,
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           booking.trainerName ?? 'Trainer',
                           style: AppTextStyles.bodyMed
                               .copyWith(color: AppColors.textPrimary),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       _StatusBadge(label: statusLabel, color: statusColor),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dateStr,
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       const Icon(
@@ -76,8 +119,9 @@ class BookingCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (booking.notes != null && booking.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                  if (booking.notes != null &&
+                      booking.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
                       booking.notes!,
                       style: AppTextStyles.caption
@@ -119,25 +163,6 @@ class BookingCard extends StatelessWidget {
       case BookingStatus.cancelled:
         return 'Cancelled';
     }
-  }
-
-}
-
-class _StatusIndicator extends StatelessWidget {
-  const _StatusIndicator({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 4,
-      height: 60,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: const BorderRadius.all(Radius.circular(4)),
-      ),
-    );
   }
 }
 

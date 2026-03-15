@@ -23,4 +23,7 @@ abstract class ProgressRepository {
     String? notes,
     String? photoStorageId,
   });
+
+  /// Permanently deletes a progress log by its document ID.
+  Future<void> deleteProgressLog(String logId);
 }

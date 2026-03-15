@@ -6,7 +6,7 @@ part of 'convex_auth_repository.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$authRepositoryHash() => r'1dd5cbad859769fb4ae5955a32d61453453c53ca';
+String _$authRepositoryHash() => r'9069dd73001ab65963b4ac9c91ebdf90a4582767';
 
 /// See also [authRepository].
 @ProviderFor(authRepository)

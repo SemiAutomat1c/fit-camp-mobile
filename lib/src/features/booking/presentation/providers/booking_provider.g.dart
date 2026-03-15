@@ -6,7 +6,7 @@ part of 'booking_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$myTrainerIdHash() => r'cb2757aea3dd265fe27c359c72b632f9aa9a3a58';
+String _$myTrainerIdHash() => r'905eaf75442793e150cbf0a681548d28ce964632';
 
 /// See also [myTrainerId].
 @ProviderFor(myTrainerId)
@@ -24,7 +24,7 @@ final myTrainerIdProvider = AutoDisposeFutureProvider<String?>.internal(
 // ignore: unused_element
 typedef MyTrainerIdRef = AutoDisposeFutureProviderRef<String?>;
 String _$trainerAvailabilityHash() =>
-    r'1244fd9b2ce571bb154fe0a73f5bd8a72af549d2';
+    r'b8aa3f1097aa6e7c490646f2625958fa9fab3393';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -168,7 +168,7 @@ class _TrainerAvailabilityProviderElement
   String get trainerId => (origin as TrainerAvailabilityProvider).trainerId;
 }
 
-String _$bookingsNotifierHash() => r'55de2f2e886b1186cf0164704c21683a91577070';
+String _$bookingsNotifierHash() => r'caa1a4bfdf296ba30624dcd76afa3bc3aa4c77a8';
 
 /// See also [BookingsNotifier].
 @ProviderFor(BookingsNotifier)

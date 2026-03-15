@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/convex_booking_repository.dart';
@@ -32,23 +31,23 @@ class BookingsNotifier extends _$BookingsNotifier {
     await future;
   }
 
-  Future<void> cancelBooking(String bookingId) async {
+  Future<void> cancelBooking(String bookingId, {String? reason}) async {
     final repo = ref.read(bookingRepositoryProvider);
-    await repo.cancelMyBooking(bookingId);
+    await repo.cancelMyBooking(bookingId, reason: reason);
     ref.invalidateSelf();
     await future;
   }
 }
 
 @riverpod
-Future<String?> myTrainerId(Ref ref) async {
+Future<String?> myTrainerId(MyTrainerIdRef ref) async {
   final repo = ref.watch(bookingRepositoryProvider);
   return repo.getMyTrainerId();
 }
 
 @riverpod
 Future<List<TrainerSlot>> trainerAvailability(
-    Ref ref, String trainerId) async {
+    TrainerAvailabilityRef ref, String trainerId) async {
   final repo = ref.watch(bookingRepositoryProvider);
   return repo.getTrainerAvailability(trainerId);
 }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
+import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/primary_button.dart';
 import '../../../../shared/widgets/skeletons/skeleton_card.dart';
 import '../../domain/entities/booking.dart';
@@ -79,8 +80,15 @@ class _BookingHomeScreenState extends ConsumerState<BookingHomeScreen>
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          // Docked Book a Session CTA zone
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(
+                top: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: PrimaryButton(
               label: 'Book a Session',
               onPressed: () => context.push('/booking/calendar'),
@@ -88,48 +96,64 @@ class _BookingHomeScreenState extends ConsumerState<BookingHomeScreen>
             ),
           ),
           Expanded(
-            child: bookingsAsync.when(
-              loading: () => const _SkeletonList(),
-              error: (e, _) => _ErrorState(
-                onRetry: () =>
-                    ref.invalidate(bookingsNotifierProvider),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              switchInCurve: Curves.easeOut,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: child,
               ),
-              data: (bookings) {
-                final upcoming = bookings
-                    .where((b) =>
-                        b.status == BookingStatus.pending ||
-                        b.status == BookingStatus.confirmed)
-                    .toList()
-                  ..sort((a, b) => a.date.compareTo(b.date));
+              child: bookingsAsync.when(
+                loading: () =>
+                    const _SkeletonList(key: ValueKey('loading')),
+                error: (e, _) => _ErrorState(
+                  key: const ValueKey('error'),
+                  onRetry: () =>
+                      ref.invalidate(bookingsNotifierProvider),
+                ),
+                data: (bookings) {
+                  final upcoming = bookings
+                      .where((b) =>
+                          b.status == BookingStatus.pending ||
+                          b.status == BookingStatus.confirmed)
+                      .toList()
+                    ..sort((a, b) => a.date.compareTo(b.date));
 
-                final past = bookings
-                    .where((b) =>
-                        b.status == BookingStatus.completed ||
-                        b.status == BookingStatus.cancelled)
-                    .toList()
-                  ..sort((a, b) => b.date.compareTo(a.date));
+                  final past = bookings
+                      .where((b) =>
+                          b.status == BookingStatus.completed ||
+                          b.status == BookingStatus.cancelled)
+                      .toList()
+                    ..sort((a, b) => b.date.compareTo(a.date));
 
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _BookingList(
-                      bookings: upcoming,
-                      emptyTitle: 'No upcoming sessions',
-                      emptySubtitle:
-                          'Tap "Book a Session" to schedule your first session.',
-                      allowSwipe: true,
-                      onCancel: _showCancelSheet,
-                    ),
-                    _BookingList(
-                      bookings: past,
-                      emptyTitle: 'No past sessions',
-                      emptySubtitle: 'Your completed sessions will appear here.',
-                      allowSwipe: false,
-                      onCancel: null,
-                    ),
-                  ],
-                );
-              },
+                  return TabBarView(
+                    key: const ValueKey('data'),
+                    controller: _tabController,
+                    children: [
+                      _BookingList(
+                        bookings: upcoming,
+                        emptyTitle: 'No upcoming sessions',
+                        emptySubtitle:
+                            'Tap "Book a Session" to schedule your first session.',
+                        emptyLottieAsset:
+                            'assets/lottie/lottie_empty_calendar.json',
+                        allowSwipe: true,
+                        onCancel: _showCancelSheet,
+                      ),
+                      _BookingList(
+                        bookings: past,
+                        emptyTitle: 'No past sessions',
+                        emptySubtitle:
+                            'Your completed sessions will appear here.',
+                        emptySvgAsset:
+                            'assets/illustrations/empty_no_history.svg',
+                        allowSwipe: false,
+                        onCancel: null,
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -147,6 +171,8 @@ class _BookingList extends StatelessWidget {
     required this.bookings,
     required this.emptyTitle,
     required this.emptySubtitle,
+    this.emptyLottieAsset,
+    this.emptySvgAsset,
     required this.allowSwipe,
     required this.onCancel,
   });
@@ -154,13 +180,20 @@ class _BookingList extends StatelessWidget {
   final List<Booking> bookings;
   final String emptyTitle;
   final String emptySubtitle;
+  final String? emptyLottieAsset;
+  final String? emptySvgAsset;
   final bool allowSwipe;
   final void Function(Booking)? onCancel;
 
   @override
   Widget build(BuildContext context) {
     if (bookings.isEmpty) {
-      return _EmptyState(title: emptyTitle, subtitle: emptySubtitle);
+      return _EmptyState(
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+        lottieAsset: emptyLottieAsset,
+        svgAsset: emptySvgAsset,
+      );
     }
 
     return ListView.separated(
@@ -237,41 +270,29 @@ class _SwipeBackground extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.title, required this.subtitle});
+  const _EmptyState({
+    required this.title,
+    required this.subtitle,
+    this.lottieAsset,
+    this.svgAsset,
+    this.action,
+  });
 
   final String title;
   final String subtitle;
+  final String? lottieAsset;
+  final String? svgAsset;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.calendar_today_outlined,
-              size: 48,
-              color: AppColors.textMuted,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style:
-                  AppTextStyles.heading4.copyWith(color: AppColors.textPrimary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style:
-                  AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      lottieAsset: lottieAsset,
+      svgAsset: svgAsset,
+      icon: Icons.calendar_today_outlined,
+      title: title,
+      subtitle: subtitle,
+      action: action,
     );
   }
 }
@@ -281,7 +302,7 @@ class _EmptyState extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
+  const _ErrorState({super.key, required this.onRetry});
 
   final VoidCallback onRetry;
 
@@ -325,7 +346,7 @@ class _ErrorState extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SkeletonList extends StatelessWidget {
-  const _SkeletonList();
+  const _SkeletonList({super.key});
 
   @override
   Widget build(BuildContext context) {

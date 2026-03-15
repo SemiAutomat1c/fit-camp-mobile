@@ -90,6 +90,14 @@ class ConvexProgressRepository implements ProgressRepository {
     );
     return result.toString();
   }
+
+  @override
+  Future<void> deleteProgressLog(String logId) async {
+    await _client.mutation(
+      name: 'mobile:deleteProgressLog',
+      args: {'logId': logId},
+    );
+  }
 }
 
 final Provider<ProgressRepository> progressRepositoryProvider =

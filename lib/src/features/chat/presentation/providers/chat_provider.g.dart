@@ -6,7 +6,7 @@ part of 'chat_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$messagesHash() => r'dac807b7bc6dbc84ac2b748b222a7ef356c9086f';
+String _$messagesHash() => r'76996ca9729ccc38e9ce098503de5236d995b0da';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -144,6 +144,23 @@ class _MessagesProviderElement
   String get conversationId => (origin as MessagesProvider).conversationId;
 }
 
+String _$unreadChatCountHash() => r'55fa31497751ec5ba36381397859062147b4c745';
+
+/// See also [unreadChatCount].
+@ProviderFor(unreadChatCount)
+final unreadChatCountProvider = AutoDisposeFutureProvider<int>.internal(
+  unreadChatCount,
+  name: r'unreadChatCountProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$unreadChatCountHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef UnreadChatCountRef = AutoDisposeFutureProviderRef<int>;
 String _$conversationsNotifierHash() =>
     r'060e64d80e744dd4b7dc2f68154f71c1023c4694';
 

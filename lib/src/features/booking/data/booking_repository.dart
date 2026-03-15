@@ -9,7 +9,7 @@ abstract interface class BookingRepository {
     required String endTime,
     String? notes,
   });
-  Future<void> cancelMyBooking(String bookingId);
+  Future<void> cancelMyBooking(String bookingId, {String? reason});
   Future<List<TrainerSlot>> getTrainerAvailability(String trainerId);
   Future<String?> getMyTrainerId();
 }

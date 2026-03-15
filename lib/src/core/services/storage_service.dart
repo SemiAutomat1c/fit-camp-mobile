@@ -84,6 +84,53 @@ class StorageService {
   }
 
   // ---------------------------------------------------------------------------
+  // Notification preferences
+  // ---------------------------------------------------------------------------
+
+  /// Saves a notification preference boolean by key.
+  Future<void> saveNotificationPref(String key, bool value) =>
+      _storage.write(key: 'fit_camp_notif_$key', value: value.toString());
+
+  /// Gets a notification preference boolean by key. Returns null if not set.
+  Future<bool?> getNotificationPref(String key) async {
+    final val = await _storage.read(key: 'fit_camp_notif_$key');
+    if (val == null) return null;
+    return val == 'true';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Intro seen
+  // ---------------------------------------------------------------------------
+
+  /// Marks the onboarding intro carousel as seen.
+  Future<void> saveIntroSeen() =>
+      _storage.write(key: 'fit_camp_intro_seen', value: 'true');
+
+  /// Returns true if the intro carousel has been seen before.
+  Future<bool> getIntroSeen() async {
+    final val = await _storage.read(key: 'fit_camp_intro_seen');
+    return val == 'true';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Completed workout count
+  // ---------------------------------------------------------------------------
+
+  /// Increments the completed workout count and returns new count.
+  Future<int> incrementCompletedWorkoutCount() async {
+    final current = await getCompletedWorkoutCount();
+    final next = current + 1;
+    await _storage.write(key: 'fit_camp_workout_count', value: next.toString());
+    return next;
+  }
+
+  /// Returns the number of completed workouts.
+  Future<int> getCompletedWorkoutCount() async {
+    final val = await _storage.read(key: 'fit_camp_workout_count');
+    return int.tryParse(val ?? '0') ?? 0;
+  }
+
+  // ---------------------------------------------------------------------------
   // Full wipe
   // ---------------------------------------------------------------------------
 

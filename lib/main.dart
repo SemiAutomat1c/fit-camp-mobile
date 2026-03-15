@@ -1,8 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'src/core/services/convex_service.dart';
+import 'src/core/services/crashlytics_service.dart';
+import 'src/features/push_notifications/services/local_notification_service.dart';
+import 'src/features/push_notifications/services/push_notification_service.dart';
 import 'src/shared/router/app_router.dart';
 import 'src/shared/theme/app_colors.dart';
 import 'src/shared/theme/app_theme.dart';
@@ -27,6 +33,18 @@ Future<void> main() async {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
+  // Firebase: guarded so the app still runs without google-services.json /
+  // GoogleService-Info.plist during development or CI.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await LocalNotificationService().initialize();
+    await CrashlyticsService().initialize();
+  } catch (e) {
+    // Firebase not configured yet — app continues without push / crash reporting.
+    debugPrint('Firebase init skipped: $e');
+  }
+
   // Initialize the Convex client singleton before the widget tree runs.
   // Sprint 1 will gate further startup on a successful connection check.
   try {
@@ -40,6 +58,12 @@ Future<void> main() async {
   runApp(
     const ProviderScope(child: FitCampApp()),
   );
+
+  // Catch all uncaught platform-level errors after runApp.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    CrashlyticsService().recordError(error, stack, fatal: true);
+    return true;
+  };
 }
 
 /// Root application widget.

@@ -161,7 +161,8 @@ class OnboardingNotifier extends _$OnboardingNotifier {
       });
 
       await storage.saveOnboardingComplete(userId);
-      ref.read(appInitProvider.notifier).state = AppInitState.ready;
+      // Navigation to /onboarding/welcome is handled by the calling screen
+      // after this returns true. AppInitState.ready is set from WelcomeScreen.
       state = state.copyWith(isSubmitting: false);
       return true;
     } catch (_) {

@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/convex_notification_repository.dart';
@@ -65,7 +64,7 @@ class NotificationsNotifier extends _$NotificationsNotifier {
 /// Derived from the local [NotificationsNotifier] list so the badge updates
 /// immediately on optimistic mark-read without a separate network round-trip.
 @riverpod
-int unreadNotificationCount(Ref ref) {
+int unreadNotificationCount(UnreadNotificationCountRef ref) {
   final listAsync = ref.watch(notificationsNotifierProvider);
   return listAsync.valueOrNull?.where((n) => !n.read).length ?? 0;
 }

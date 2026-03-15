@@ -7,7 +7,7 @@ part of 'notification_provider.dart';
 // **************************************************************************
 
 String _$unreadNotificationCountHash() =>
-    r'f51aca475a97bb5f22883e1171a28cd079ac835d';
+    r'ecc641b90bd145fac003c38e88b19538381373f3';
 
 /// Provides the count of unread notifications used by [NotificationBell].
 ///

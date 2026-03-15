@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/primary_button.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/training_plan.dart';
+import '../providers/training_provider.dart';
 import '../widgets/plan_detail_widgets.dart';
 
-class TrainingPlanDetailScreen extends StatelessWidget {
+class TrainingPlanDetailScreen extends ConsumerWidget {
   const TrainingPlanDetailScreen({super.key, required this.plan});
 
   final TrainingPlan plan;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final dateStr = DateFormat('MMM d, yyyy').format(plan.createdAt);
     final subtitle = plan.trainerName ?? plan.memberName;
+    final isTrainer =
+        ref.watch(authNotifierProvider).valueOrNull?.isTrainer ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -26,59 +35,114 @@ class TrainingPlanDetailScreen extends StatelessWidget {
           plan.name,
           style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary),
         ),
+        actions: [
+          if (isTrainer && plan.isActive)
+            IconButton(
+              tooltip: 'Deactivate Plan',
+              icon: const Icon(Icons.block_rounded, color: AppColors.error),
+              onPressed: () => showAppConfirmDialog(
+                context,
+                title: 'Deactivate Plan?',
+                body:
+                    'This plan will be marked inactive and the member will no longer see it as their active plan.',
+                confirmLabel: 'Deactivate',
+                confirmColor: AppColors.error,
+                showWarningIcon: true,
+                onConfirm: () async {
+                  try {
+                    await ref
+                        .read(trainingPlansNotifierProvider.notifier)
+                        .deactivatePlan(plan.id);
+                    if (context.mounted) {
+                      AppSnackbar.success(context, 'Plan deactivated.');
+                      Navigator.of(context).pop();
+                    }
+                  } catch (_) {
+                    if (context.mounted) {
+                      AppSnackbar.error(
+                          context, 'Failed to deactivate plan. Try again.');
+                    }
+                  }
+                },
+              ),
+            ),
+        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      body: Column(
         children: [
-          // Active badge
-          Align(
-            alignment: Alignment.centerLeft,
-            child: PlanActiveBadge(isActive: plan.isActive),
-          ),
-          const SizedBox(height: 12),
-          // Description
-          if (plan.description != null && plan.description!.isNotEmpty) ...[
-            Text(
-              plan.description!,
-              style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              children: [
+                // Active badge
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: PlanActiveBadge(isActive: plan.isActive),
+                ),
+                const SizedBox(height: 12),
+                // Description
+                if (plan.description != null &&
+                    plan.description!.isNotEmpty) ...[
+                  Text(
+                    plan.description!,
+                    style:
+                        AppTextStyles.body.copyWith(color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Trainer / Member
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  PlanMetaRow(
+                    icon: Icons.person_outline_rounded,
+                    text: subtitle,
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                // Created date
+                PlanMetaRow(
+                  icon: Icons.calendar_today_outlined,
+                  text: dateStr,
+                ),
+                const SizedBox(height: 24),
+                // Section heading
+                Text(
+                  'Exercises',
+                  style: AppTextStyles.heading4
+                      .copyWith(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                // Exercise list
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: plan.exercises.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final exercise = plan.exercises[index];
+                    return _ExerciseTile(
+                      number: index + 1,
+                      exercise: exercise,
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-          ],
-          // Trainer / Member
-          if (subtitle != null && subtitle.isNotEmpty) ...[
-            PlanMetaRow(
-              icon: Icons.person_outline_rounded,
-              text: subtitle,
+          ),
+          // Start Workout button — members only
+          if (!isTrainer && plan.exercises.isNotEmpty)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: PrimaryButton(
+                  label: 'Start Workout',
+                  icon: Icons.play_arrow_rounded,
+                  onPressed: () => context.push(
+                    '/training/session/${plan.id}',
+                    extra: plan,
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 6),
-          ],
-          // Created date
-          PlanMetaRow(
-            icon: Icons.calendar_today_outlined,
-            text: dateStr,
-          ),
-          const SizedBox(height: 24),
-          // Section heading
-          Text(
-            'Exercises',
-            style:
-                AppTextStyles.heading4.copyWith(color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 12),
-          // Exercise list
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: plan.exercises.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final exercise = plan.exercises[index];
-              return _ExerciseTile(
-                number: index + 1,
-                exercise: exercise,
-              );
-            },
-          ),
         ],
       ),
     );
@@ -114,8 +178,7 @@ class _ExerciseTile extends StatelessWidget {
         ),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          childrenPadding:
-              const EdgeInsets.fromLTRB(56, 0, 16, 12),
+          childrenPadding: const EdgeInsets.fromLTRB(56, 0, 16, 12),
           collapsedBackgroundColor: Colors.transparent,
           backgroundColor: Colors.transparent,
           leading: _NumberCircle(number: number),
@@ -133,9 +196,7 @@ class _ExerciseTile extends StatelessWidget {
             ],
           ),
           // Only show expand arrow when there are notes
-          trailing: hasNotes
-              ? null
-              : const SizedBox.shrink(),
+          trailing: hasNotes ? null : const SizedBox.shrink(),
           children: hasNotes
               ? [
                   Text(
@@ -232,4 +293,3 @@ class _Chip extends StatelessWidget {
     );
   }
 }
-

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:percent_indicator/linear_percent_indicator.dart';
 
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_avatar.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/error_view.dart';
+import '../../../../shared/widgets/neon_gradient_card.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 
@@ -24,6 +29,18 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         title: const Text('Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Profile',
+            onPressed: () => context.push('/profile/edit'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
       ),
       body: profileAsync.when(
         loading: () => const Center(
@@ -121,6 +138,20 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ).animate().fadeIn(delay: 400.ms),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.push('/profile/delete-account'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textMuted,
+                    ),
+                    child: Text(
+                      'Delete Account',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textMuted),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -132,44 +163,14 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.elevated,
-        title: Text(
-          'Sign Out?',
-          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary),
-        ),
-        content: Text(
-          'Are you sure you want to sign out?',
-          style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textMuted,
-            ),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-            ),
-            child: Text(
-              'Sign Out',
-              style: AppTextStyles.button.copyWith(color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
+    await showAppConfirmDialog(
+      context,
+      title: 'Sign Out?',
+      body: 'Are you sure you want to sign out?',
+      confirmLabel: 'Sign Out',
+      confirmColor: AppColors.error,
+      onConfirm: () => ref.read(authNotifierProvider.notifier).signOut(),
     );
-
-    if (confirmed == true && context.mounted) {
-      await ref.read(authNotifierProvider.notifier).signOut();
-      // GoRouter redirect handles navigation to /login automatically.
-    }
   }
 }
 
@@ -306,6 +307,24 @@ class _SubscriptionCard extends StatelessWidget {
             DateTime.fromMillisecondsSinceEpoch(endMs))
         : null;
 
+    // Days remaining progress
+    double? daysPercent;
+    int? daysLeft;
+    Color progressColor = AppColors.primary;
+    if (startMs != null && endMs != null) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final totalDays = (endMs - startMs) / 86400000;
+      final elapsedDays = (now - startMs) / 86400000;
+      daysLeft = ((endMs - now) / 86400000).ceil().clamp(0, 9999);
+      daysPercent =
+          (1 - (elapsedDays / totalDays)).clamp(0.0, 1.0);
+      if (daysLeft < 7) {
+        progressColor = AppColors.error;
+      } else if (daysLeft < 14) {
+        progressColor = AppColors.warning;
+      }
+    }
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,6 +358,32 @@ class _SubscriptionCard extends StatelessWidget {
                   : '₱${_formatPrice(pricePaid)}',
               style: AppTextStyles.caption
                   .copyWith(color: AppColors.textMuted),
+            ),
+          ],
+          // Days remaining progress bar
+          if (daysPercent != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$daysLeft days remaining',
+                  style: AppTextStyles.label.copyWith(
+                    color: progressColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            LinearPercentIndicator(
+              lineHeight: 4,
+              percent: daysPercent,
+              backgroundColor: AppColors.border,
+              progressColor: progressColor,
+              barRadius: const Radius.circular(4),
+              padding: EdgeInsets.zero,
+              animation: true,
+              animationDuration: 800,
             ),
           ],
         ],
@@ -423,7 +468,7 @@ class _TrainerCard extends StatelessWidget {
     final name = trainer['name'] as String? ?? 'Your Trainer';
     final avatarUrl = trainer['avatarUrl'] as String?;
 
-    return AppCard(
+    return NeonGradientCard(
       child: Row(
         children: [
           AppAvatar(
@@ -432,9 +477,29 @@ class _TrainerCard extends StatelessWidget {
             size: AppAvatarSize.md,
           ),
           const SizedBox(width: 12),
-          Text(
-            name,
-            style: AppTextStyles.bodyMed.copyWith(color: AppColors.textPrimary),
+          Expanded(
+            child: Text(
+              name,
+              style:
+                  AppTextStyles.bodyMed.copyWith(color: AppColors.textPrimary),
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () => context.push('/chat'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withAlpha(120)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Message',
+              style: AppTextStyles.label.copyWith(color: AppColors.primary),
+            ),
           ),
         ],
       ),
@@ -459,33 +524,57 @@ class _ProfileDetailsCard extends StatelessWidget {
     final height = profile['height'] as num?;
     final weight = profile['weight'] as num?;
 
+    final chips = <_ChipData>[
+      if (goal != null)
+        _ChipData(label: 'Goal', value: _goalLabel(goal)),
+      if (age != null)
+        _ChipData(label: 'Age', value: '${age.toInt()} yrs'),
+      if (gender != null)
+        _ChipData(label: 'Gender', value: _capitalise(gender)),
+      if (height != null)
+        _ChipData(label: 'Height', value: '${height.toInt()} cm'),
+      if (weight != null)
+        _ChipData(label: 'Weight', value: '${weight.toInt()} kg'),
+    ];
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
     return AppCard(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: chips.map(_buildChip).toList(),
+      ),
+    );
+  }
+
+  Widget _buildChip(_ChipData data) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.elevated,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (goal != null) ...[
-            _DetailRow(label: 'Goal', value: _goalLabel(goal)),
-            const SizedBox(height: 8),
-          ],
-          if (age != null || gender != null)
-            _DetailRow(
-              label: 'Age / Gender',
-              value: [
-                if (age != null) '${age.toInt()}',
-                if (gender != null) _capitalise(gender),
-              ].join(' · '),
+          Text(
+            data.label,
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.textMuted,
+              fontSize: 10,
             ),
-          if ((age != null || gender != null) &&
-              (height != null || weight != null))
-            const SizedBox(height: 8),
-          if (height != null || weight != null)
-            _DetailRow(
-              label: 'Height / Weight',
-              value: [
-                if (height != null) '${height.toInt()} cm',
-                if (weight != null) '${weight.toInt()} kg',
-              ].join(' · '),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            data.value,
+            style: AppTextStyles.bodyMed.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 14,
             ),
+          ),
         ],
       ),
     );
@@ -504,31 +593,8 @@ class _ProfileDetailsCard extends StatelessWidget {
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
+class _ChipData {
+  const _ChipData({required this.label, required this.value});
   final String label;
   final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            label,
-            style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-          ),
-        ),
-      ],
-    );
-  }
 }

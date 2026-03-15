@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/models/app_user.dart';
 import '../../../../core/services/convex_provider.dart';
+import '../../../../core/services/crashlytics_service.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../../../shared/router/app_router.dart';
 import '../../data/convex_auth_repository.dart';
@@ -85,6 +86,7 @@ class AuthNotifier extends _$AuthNotifier {
       final user = await repo.signIn(email, password);
 
       state = AsyncValue.data(user);
+      CrashlyticsService().setUserId(user.id);
 
       final storage = ref.read(storageServiceProvider);
       final onboardingDone = await storage.getOnboardingComplete(user.id);

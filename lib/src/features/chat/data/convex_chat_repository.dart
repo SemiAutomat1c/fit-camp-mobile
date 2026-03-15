@@ -70,6 +70,42 @@ class ConvexChatRepository implements ChatRepository {
       args: {'conversationId': jsonEncode(conversationId)},
     );
   }
+
+  @override
+  Future<String> generateUploadUrl() async {
+    final result = await _client.mutation(
+      name: 'messages:generateUploadUrl',
+      args: {},
+    );
+    return result.toString();
+  }
+
+  @override
+  Future<void> sendImageMessage(
+    String conversationId,
+    String storageId,
+  ) async {
+    await _client.mutation(
+      name: 'messages:send',
+      args: {
+        'conversationId': jsonEncode(conversationId),
+        'storageId': storageId,
+      },
+    );
+  }
+
+  @override
+  Future<int> getUnreadCount() async {
+    final raw = await _client.query('mobile:getUnreadMessageCount', {});
+    try {
+      final decoded = jsonDecode(raw.toString());
+      if (decoded is int) return decoded;
+      if (decoded is num) return decoded.toInt();
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 }
 
 final Provider<ChatRepository> chatRepositoryProvider =

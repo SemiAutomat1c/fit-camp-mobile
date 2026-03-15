@@ -2,17 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/empty_state.dart';
+import '../../../../shared/widgets/permission_rationale_dialog.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/convex_chat_repository.dart';
 import '../../domain/entities/message.dart';
 import '../providers/chat_provider.dart';
+import '../providers/typing_provider.dart';
 import '../widgets/chat_input.dart';
 import '../widgets/day_header.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/typing_indicator.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   const ChatRoomScreen({
@@ -33,6 +39,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     with WidgetsBindingObserver {
   Timer? _pollTimer;
+  bool _askedPermission = false;
 
   @override
   void initState() {
@@ -53,6 +60,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     try {
       final repo = ref.read(chatRepositoryProvider);
       await repo.markRead(widget.conversationId);
+      // Invalidate the unread count badge so it updates immediately.
+      ref.invalidate(unreadChatCountProvider);
     } catch (_) {
       // Best-effort — do not surface mark-read errors to the user.
     }
@@ -65,6 +74,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     } else if (state == AppLifecycleState.resumed) {
       _startPolling();
       ref.invalidate(messagesProvider(widget.conversationId));
+      _markRead();
     }
   }
 
@@ -75,7 +85,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     super.dispose();
   }
 
+  // -------------------------------------------------------------------------
+  // Text message
+  // -------------------------------------------------------------------------
+
   Future<void> _sendMessage(String content) async {
+    // Stop typing indicator on send.
+    ref
+        .read(typingNotifierProvider(widget.conversationId).notifier)
+        .stopTyping();
+
     final tempId = 'pending_${DateTime.now().millisecondsSinceEpoch}';
     final currentUserId =
         ref.read(authNotifierProvider).valueOrNull?.id ?? '';
@@ -116,11 +135,111 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
     _sendMessage(msg.content);
   }
 
+  // -------------------------------------------------------------------------
+  // Image picking & uploading
+  // -------------------------------------------------------------------------
+
+  Future<void> _pickAndSendImage() async {
+    if (!_askedPermission) {
+      if (!mounted) return;
+      final allowed = await showPermissionRationaleDialog(
+        context,
+        icon: Icons.photo_library_outlined,
+        title: 'Photo Access',
+        body:
+            'We need access to your photo library so you can share images with your trainer.',
+      );
+      _askedPermission = true;
+      if (!allowed) return;
+    }
+
+    final picker = ImagePicker();
+    final XFile? picked;
+    try {
+      picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+    } catch (_) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Could not open photo library.');
+      }
+      return;
+    }
+
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+
+    // Show a temporary pending message so the UI feels responsive.
+    final currentUserId =
+        ref.read(authNotifierProvider).valueOrNull?.id ?? '';
+    final tempId = 'pending_img_${DateTime.now().millisecondsSinceEpoch}';
+    ref
+        .read(pendingMessagesProvider(widget.conversationId).notifier)
+        .addPending(Message(
+          id: tempId,
+          conversationId: widget.conversationId,
+          senderId: currentUserId,
+          content: '',
+          createdAt: DateTime.now(),
+          isPending: true,
+        ));
+
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+
+      // 1. Get a one-time upload URL from Convex.
+      final uploadUrl = await repo.generateUploadUrl();
+
+      // 2. PUT the image bytes to the upload URL.
+      final mimeType = picked.mimeType ?? 'image/jpeg';
+      final uploadResponse = await http.put(
+        Uri.parse(uploadUrl),
+        headers: {'Content-Type': mimeType},
+        body: bytes,
+      );
+
+      if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
+        throw Exception(
+            'Upload failed with status ${uploadResponse.statusCode}');
+      }
+
+      // 3. The storage ID is returned in the response body by Convex.
+      final storageId = uploadResponse.body.trim().replaceAll('"', '');
+
+      // 4. Send the image message referencing the storage ID.
+      await repo.sendImageMessage(widget.conversationId, storageId);
+
+      ref
+          .read(pendingMessagesProvider(widget.conversationId).notifier)
+          .removePending(tempId);
+      ref.invalidate(messagesProvider(widget.conversationId));
+    } catch (_) {
+      ref
+          .read(pendingMessagesProvider(widget.conversationId).notifier)
+          .markFailed(tempId);
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to send image. Tap to retry.');
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Build
+  // -------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(messagesProvider(widget.conversationId));
     final pending = ref.watch(pendingMessagesProvider(widget.conversationId));
     final userId = ref.watch(authNotifierProvider).valueOrNull?.id;
+    final isOtherTyping = ref
+        .watch(isOtherTypingProvider(widget.conversationId))
+        .valueOrNull ??
+        false;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -155,12 +274,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
               data: (serverMessages) {
                 final allMessages = [...serverMessages, ...pending];
                 if (allMessages.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No messages yet. Say hello!',
-                      style: AppTextStyles.body
-                          .copyWith(color: AppColors.textMuted),
-                    ),
+                  return const EmptyState(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'No messages yet',
+                    subtitle: 'Say hello to your trainer!',
                   );
                 }
 
@@ -181,7 +298,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
                     final bubble = MessageBubble(
                       message: msg,
                       isOwn: isOwn,
-                      showTimestamp: msgItem.showTimestamp,
+                      alwaysShowTimestamp: msgItem.showTimestamp,
                       senderName: isOwn ? null : widget.otherName,
                       senderAvatarUrl: isOwn ? null : widget.otherAvatarUrl,
                     );
@@ -197,7 +314,20 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
               },
             ),
           ),
-          ChatInput(onSend: _sendMessage),
+
+          // Typing indicator sits between messages and the input bar.
+          TypingIndicator(isVisible: isOtherTyping),
+
+          ChatInput(
+            onSend: _sendMessage,
+            onPickImage: _pickAndSendImage,
+            onTextChanged: () {
+              ref
+                  .read(
+                      typingNotifierProvider(widget.conversationId).notifier)
+                  .startTyping();
+            },
+          ),
         ],
       ),
     );
@@ -220,8 +350,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen>
       final msgDay =
           DateTime(msg.createdAt.year, msg.createdAt.month, msg.createdAt.day);
       final prevDay = prev != null
-          ? DateTime(prev.createdAt.year, prev.createdAt.month,
-              prev.createdAt.day)
+          ? DateTime(
+              prev.createdAt.year, prev.createdAt.month, prev.createdAt.day)
           : null;
 
       if (prevDay == null || msgDay != prevDay) {

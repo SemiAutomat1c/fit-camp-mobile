@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#0A0A0A"/>
+  <polyline points="80,220 140,180 200,200 260,140 320,100" fill="none" stroke="#39FF14" stroke-width="2" opacity="0.5" stroke-dasharray="6,4"/>
+  <circle cx="80" cy="220" r="5" fill="#39FF14" opacity="0.5"/>
+  <circle cx="140" cy="180" r="5" fill="#39FF14" opacity="0.5"/>
+  <circle cx="200" cy="200" r="5" fill="#39FF14" opacity="0.5"/>
+  <circle cx="260" cy="140" r="5" fill="#39FF14" opacity="0.5"/>
+  <circle cx="320" cy="100" r="5" fill="#39FF14" opacity="0.7"/>
+  <line x1="80" y1="230" x2="320" y2="230" stroke="#39FF14" stroke-width="1" opacity="0.2"/>
+</svg>

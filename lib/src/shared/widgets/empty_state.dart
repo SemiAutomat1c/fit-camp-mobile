@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lottie/lottie.dart';
+
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
-/// Empty state illustration: icon + title + optional subtitle + optional CTA.
+/// Empty state with illustration, title, optional subtitle, and optional CTA.
+///
+/// Illustration priority (highest → lowest):
+///  1. [lottieAsset] — looping Lottie animation at width 180
+///  2. [svgAsset]    — SVG illustration at width 160
+///  3. [icon]        — large [IconData] (original fallback)
 ///
 /// ```dart
 /// EmptyState(
-///   icon: Icons.calendar_month_outlined,
+///   lottieAsset: 'assets/lottie/lottie_empty_calendar.json',
 ///   title: 'No sessions booked',
 ///   subtitle: 'Book your first session to get started.',
 ///   action: PrimaryButton(label: 'Browse Sessions', onPressed: _browse),
@@ -15,13 +23,22 @@ import '../theme/app_text_styles.dart';
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
-    required this.icon,
+    this.icon,
+    this.lottieAsset,
+    this.svgAsset,
     required this.title,
     this.subtitle,
     this.action,
   });
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Path to a Lottie JSON asset. Takes priority over [svgAsset] and [icon].
+  final String? lottieAsset;
+
+  /// Path to an SVG asset. Takes priority over [icon].
+  final String? svgAsset;
+
   final String title;
   final String? subtitle;
   final Widget? action;
@@ -29,7 +46,8 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? AppColors.textPrimary : AppColors.lightTextPrimary;
+    final titleColor =
+        isDark ? AppColors.textPrimary : AppColors.lightTextPrimary;
     final mutedColor = isDark ? AppColors.textMuted : AppColors.lightTextMuted;
 
     return Center(
@@ -38,7 +56,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: mutedColor),
+            _buildIllustration(mutedColor),
             const SizedBox(height: 20),
             Text(
               title,
@@ -65,5 +83,26 @@ class EmptyState extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildIllustration(Color iconColor) {
+    if (lottieAsset != null) {
+      return Lottie.asset(
+        lottieAsset!,
+        width: 180,
+        height: 180,
+        repeat: true,
+        errorBuilder: (_, __, ___) =>
+            Icon(icon ?? Icons.hourglass_empty, size: 64, color: iconColor),
+      );
+    }
+    if (svgAsset != null) {
+      return SvgPicture.asset(
+        svgAsset!,
+        width: 160,
+        height: 160,
+      );
+    }
+    return Icon(icon ?? Icons.hourglass_empty, size: 64, color: iconColor);
   }
 }

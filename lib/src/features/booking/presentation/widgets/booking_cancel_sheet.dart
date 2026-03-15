@@ -29,6 +29,14 @@ class BookingCancelSheet extends ConsumerStatefulWidget {
 
 class _BookingCancelSheetState extends ConsumerState<BookingCancelSheet> {
   bool _isCancelling = false;
+  String? _selectedReason;
+
+  static const List<String> _reasons = [
+    'Change of plans',
+    'Emergency',
+    'Scheduling conflict',
+    'Other',
+  ];
 
   Future<void> _cancel() async {
     HapticFeedback.mediumImpact();
@@ -37,7 +45,7 @@ class _BookingCancelSheetState extends ConsumerState<BookingCancelSheet> {
     try {
       await ref
           .read(bookingsNotifierProvider.notifier)
-          .cancelBooking(widget.bookingId);
+          .cancelBooking(widget.bookingId, reason: _selectedReason);
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -111,7 +119,49 @@ class _BookingCancelSheetState extends ConsumerState<BookingCancelSheet> {
             style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+
+          // Reason chips
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Reason (optional)',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _reasons.map((reason) {
+              final selected = _selectedReason == reason;
+              return FilterChip(
+                label: Text(reason),
+                selected: selected,
+                onSelected: _isCancelling
+                    ? null
+                    : (_) => setState(
+                          () => _selectedReason =
+                              selected ? null : reason,
+                        ),
+                selectedColor: AppColors.error.withAlpha(30),
+                checkmarkColor: AppColors.error,
+                side: BorderSide(
+                  color: selected ? AppColors.error : AppColors.border,
+                  width: selected ? 1.5 : 1,
+                ),
+                backgroundColor: AppColors.surface,
+                labelStyle: AppTextStyles.caption.copyWith(
+                  color: selected ? AppColors.error : AppColors.textMuted,
+                ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(20)),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -157,5 +207,4 @@ class _BookingCancelSheetState extends ConsumerState<BookingCancelSheet> {
       ),
     );
   }
-
 }

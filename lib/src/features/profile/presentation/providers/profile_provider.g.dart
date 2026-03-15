@@ -6,7 +6,7 @@ part of 'profile_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$myProfileHash() => r'4c887ca384748ec47b62cc9f7c4d1f3a9ffcd775';
+String _$myProfileHash() => r'526df41e69d6e56c6056a875a56c4fcec8ec1855';
 
 /// Fetches the current user's fitness profile from Convex.
 ///
@@ -28,7 +28,7 @@ final myProfileProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MyProfileRef = AutoDisposeFutureProviderRef<Map<String, dynamic>?>;
-String _$mySubscriptionHash() => r'484af84de68e968d2169d705df3f6e663b5ed30a';
+String _$mySubscriptionHash() => r'c8a6c45918bd50656257e4c574dc079f152194ac';
 
 /// Fetches the current user's active subscription from Convex.
 ///

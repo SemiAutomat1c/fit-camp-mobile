@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/services/convex_provider.dart';
 import '../../../../shared/router/app_router.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../providers/auth_provider.dart';
@@ -10,6 +12,10 @@ import '../providers/auth_provider.dart';
 /// Displays for a minimum of 1200 ms while the auth check runs concurrently.
 /// After both complete, [AppInitState] is updated by [AuthNotifier.checkAuth]
 /// and GoRouter's redirect handles navigation — no [Navigator.push] calls.
+///
+/// Special case: if the auth check results in [AppInitState.unauthenticated]
+/// and the intro carousel has not been seen, this screen navigates to `/intro`
+/// before GoRouter's redirect can send the user to `/login`.
 ///
 /// Animations:
 /// - [FadeTransition] on the logo block: 600 ms, [Curves.easeIn]
@@ -88,6 +94,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ref.read(authNotifierProvider.notifier).checkAuth(),
       Future<void>.delayed(const Duration(milliseconds: 1200)),
     ]);
+
+    if (!mounted) return;
+
+    // If unauthenticated and the intro carousel has never been seen,
+    // push to /intro before GoRouter's redirect fires.
+    if (ref.read(appInitProvider) == AppInitState.unauthenticated) {
+      final storage = ref.read(storageServiceProvider);
+      final seen = await storage.getIntroSeen();
+      if (!seen && mounted) {
+        context.go('/intro');
+        return;
+      }
+    }
+    // GoRouter redirect handles all other transitions.
   }
 
   @override

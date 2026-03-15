@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:convex_flutter/convex_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/models/app_user.dart';
@@ -152,7 +151,7 @@ class ConvexAuthRepository implements AuthRepository {
 // ---------------------------------------------------------------------------
 
 @riverpod
-AuthRepository authRepository(Ref ref) => ConvexAuthRepository(
+AuthRepository authRepository(AuthRepositoryRef ref) => ConvexAuthRepository(
       client: ref.watch(convexClientProvider),
       storage: ref.watch(storageServiceProvider),
     );

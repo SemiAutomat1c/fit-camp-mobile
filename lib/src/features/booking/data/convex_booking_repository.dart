@@ -44,10 +44,13 @@ class ConvexBookingRepository implements BookingRepository {
   }
 
   @override
-  Future<void> cancelMyBooking(String bookingId) async {
+  Future<void> cancelMyBooking(String bookingId, {String? reason}) async {
     await _client.mutation(
       name: 'mobile:cancelMyBooking',
-      args: {'bookingId': bookingId},
+      args: {
+        'bookingId': bookingId,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
     );
   }
 

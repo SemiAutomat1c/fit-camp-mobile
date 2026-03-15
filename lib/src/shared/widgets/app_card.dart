@@ -7,9 +7,13 @@ import '../theme/app_colors.dart';
 /// (80 ms easeInOut) and springs back (120 ms easeOut), giving tactile
 /// feedback. A brand-green splash at 8% opacity is also shown.
 ///
+/// Pass [backgroundGradient] to overlay a gradient on top of the surface
+/// color — use [kNeonTintGradient] for the standard neon tint.
+///
 /// ```dart
 /// AppCard(
 ///   onTap: () => _openDetail(item),
+///   backgroundGradient: kNeonTintGradient,
 ///   child: Text(item.title),
 /// )
 /// ```
@@ -19,15 +23,27 @@ class AppCard extends StatefulWidget {
     required this.child,
     this.padding,
     this.onTap,
+    this.backgroundGradient,
   });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final VoidCallback? onTap;
 
+  /// Optional gradient overlaid on the surface color.
+  /// All existing callers are unaffected (null = original behavior).
+  final LinearGradient? backgroundGradient;
+
   @override
   State<AppCard> createState() => _AppCardState();
 }
+
+/// Standard neon tint gradient — ~4% neon green fading top-left to transparent.
+const LinearGradient kNeonTintGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [Color(0x0A39FF14), Color(0x00000000)],
+);
 
 class _AppCardState extends State<AppCard> {
   bool _pressed = false;
@@ -59,6 +75,7 @@ class _AppCardState extends State<AppCard> {
     final shell = _CardShell(
       surfaceColor: surfaceColor,
       borderColor: borderColor,
+      backgroundGradient: widget.backgroundGradient,
       child: widget.onTap == null
           ? cardContent
           : InkWell(
@@ -93,11 +110,13 @@ class _CardShell extends StatelessWidget {
     required this.child,
     required this.surfaceColor,
     required this.borderColor,
+    this.backgroundGradient,
   });
 
   final Widget child;
   final Color surfaceColor;
   final Color borderColor;
+  final LinearGradient? backgroundGradient;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +128,18 @@ class _CardShell extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.all(Radius.circular(16)),
-        child: child,
+        child: backgroundGradient == null
+            ? child
+            : Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(gradient: backgroundGradient),
+                    ),
+                  ),
+                  child,
+                ],
+              ),
       ),
     );
   }

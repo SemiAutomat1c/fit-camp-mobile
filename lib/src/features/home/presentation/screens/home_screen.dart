@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +7,11 @@ import 'package:intl/intl.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/animated_stat_value.dart';
+import '../../../../shared/widgets/app_avatar.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/neon_gradient_card.dart';
+import '../../../../shared/widgets/neon_stat_card.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../booking/domain/entities/booking.dart';
 import '../../../booking/presentation/providers/booking_provider.dart';
@@ -29,18 +34,7 @@ class HomeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
-              Text(
-                '$greeting,',
-                style: AppTextStyles.body
-                    .copyWith(color: AppColors.textMuted),
-              ),
-              Text(
-                user?.name.split(' ').first ?? 'there',
-                style: AppTextStyles.heading2
-                    .copyWith(color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 16),
-              const _StatsStrip(),
+              _HeroCard(user: user, greeting: greeting),
               const SizedBox(height: 24),
               Text(
                 'Next Session',
@@ -74,6 +68,151 @@ class HomeScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Hero card (greeting + avatar + stats)
+// ---------------------------------------------------------------------------
+
+class _HeroCard extends ConsumerWidget {
+  const _HeroCard({required this.user, required this.greeting});
+
+  final dynamic user;
+  final String greeting;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bookingsAsync = ref.watch(bookingsNotifierProvider);
+    final progressAsync = ref.watch(progressLogsProvider);
+
+    int sessionsThisWeek = 0;
+    bookingsAsync.whenData((bookings) {
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStartDay =
+          DateTime(weekStart.year, weekStart.month, weekStart.day);
+      sessionsThisWeek = bookings
+          .where((b) =>
+              (b.status == BookingStatus.confirmed ||
+                  b.status == BookingStatus.completed) &&
+              !b.date.isBefore(weekStartDay))
+          .length;
+    });
+
+    double? latestWeight;
+    progressAsync.whenData((logs) {
+      if (logs.isNotEmpty) {
+        final withWeight = logs.where((l) => l.weight != null).toList();
+        if (withWeight.isNotEmpty) latestWeight = withWeight.first.weight;
+      }
+    });
+
+    final firstName = user?.name.split(' ').first ?? 'there';
+    final avatarUrl = user?.avatarUrl as String?;
+    final name = user?.name as String? ?? '';
+
+    return NeonGradientCard(
+      gradientOpacity: 0.08,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting row + avatar
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting,
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.textMuted),
+                    ),
+                    Text(
+                      firstName,
+                      style: AppTextStyles.heading2
+                          .copyWith(color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => context.push('/profile'),
+                child: AppAvatar(
+                  name: name.isNotEmpty ? name : 'User',
+                  imageUrl: avatarUrl,
+                  size: AppAvatarSize.md,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Stats row
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: NeonStatCard(
+                    value: sessionsThisWeek.toString(),
+                    label: 'Sessions\nThis Week',
+                    percent: (sessionsThisWeek / 5).clamp(0.0, 1.0),
+                    accentColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: latestWeight != null
+                      ? _WeightStatCard(weight: latestWeight!)
+                      : const NeonStatCard(
+                          value: '—',
+                          label: 'Current\nWeight',
+                          accentColor: AppColors.primary,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeightStatCard extends StatelessWidget {
+  const _WeightStatCard({required this.weight});
+
+  final double weight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedStatValue(
+            targetValue: weight,
+            suffix: ' kg',
+            style: AppTextStyles.heading3
+                .copyWith(color: AppColors.primary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Current\nWeight',
+            style:
+                AppTextStyles.label.copyWith(color: AppColors.textMuted),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Next session card
 // ---------------------------------------------------------------------------
 
@@ -103,7 +242,8 @@ class _NextSessionCard extends ConsumerWidget {
         if (upcoming.isEmpty) {
           return _buildShell(
             context,
-            child: _NoNextSession(onBookNow: () => context.push('/booking/calendar')),
+            child:
+                _NoNextSession(onBookNow: () => context.push('/booking/calendar')),
           );
         }
 
@@ -188,8 +328,7 @@ class _NextSessionContent extends StatelessWidget {
   static String _relativeDate(DateTime date, String startTime) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final sessionDay =
-        DateTime(date.year, date.month, date.day);
+    final sessionDay = DateTime(date.year, date.month, date.day);
     final diff = sessionDay.difference(today).inDays;
     final timeStr = formatTime(startTime);
 
@@ -197,7 +336,6 @@ class _NextSessionContent extends StatelessWidget {
     if (diff == 1) return 'Tomorrow at $timeStr';
     return '${DateFormat('EEE, MMM d').format(date)} at $timeStr';
   }
-
 }
 
 class _NoNextSession extends StatelessWidget {
@@ -258,17 +396,17 @@ class _QuickActions extends StatelessWidget {
     const actions = [
       _ActionData(
         icon: Icons.calendar_month_rounded,
-        label: 'Book Session',
+        label: 'BOOK\nSESSION',
         route: '/booking',
       ),
       _ActionData(
         icon: Icons.fitness_center_rounded,
-        label: 'My Plans',
+        label: 'MY\nPLANS',
         route: '/training',
       ),
       _ActionData(
         icon: Icons.trending_up_rounded,
-        label: 'Log Progress',
+        label: 'LOG\nPROGRESS',
         route: '/progress',
       ),
     ];
@@ -302,101 +440,6 @@ class _ActionData {
   final String route;
 }
 
-// ---------------------------------------------------------------------------
-// Stats strip
-// ---------------------------------------------------------------------------
-
-class _StatsStrip extends ConsumerWidget {
-  const _StatsStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bookingsAsync = ref.watch(bookingsNotifierProvider);
-    final progressAsync = ref.watch(progressLogsProvider);
-
-    // Sessions this week
-    int sessionsThisWeek = 0;
-    bookingsAsync.whenData((bookings) {
-      final now = DateTime.now();
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final weekStartDay = DateTime(weekStart.year, weekStart.month, weekStart.day);
-      sessionsThisWeek = bookings
-          .where((b) =>
-              (b.status == BookingStatus.confirmed ||
-                  b.status == BookingStatus.completed) &&
-              !b.date.isBefore(weekStartDay))
-          .length;
-    });
-
-    // Latest weight
-    double? latestWeight;
-    progressAsync.whenData((logs) {
-      if (logs.isNotEmpty) {
-        final withWeight = logs.where((l) => l.weight != null).toList();
-        if (withWeight.isNotEmpty) {
-          latestWeight = withWeight.first.weight;
-        }
-      }
-    });
-
-    return AppCard(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: _StatItem(
-                value: sessionsThisWeek.toString(),
-                label: 'Sessions\nThis Week',
-              ),
-            ),
-            const VerticalDivider(
-              color: AppColors.border,
-              thickness: 1,
-              width: 1,
-            ),
-            Expanded(
-              child: _StatItem(
-                value: latestWeight != null
-                    ? '${latestWeight!.toStringAsFixed(1)} kg'
-                    : '—',
-                label: 'Current\nWeight',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  const _StatItem({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: AppTextStyles.heading2.copyWith(color: AppColors.primary),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTextStyles.label.copyWith(color: AppColors.textMuted),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-}
-
 class _ActionCard extends StatelessWidget {
   const _ActionCard({required this.data});
 
@@ -413,9 +456,9 @@ class _ActionCard extends StatelessWidget {
           Container(
             width: 48,
             height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0x1F39FF14), // primary @ ~12% opacity
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: AppColors.primary.withAlpha(20),
             ),
             child: Icon(
               data.icon,
@@ -427,11 +470,21 @@ class _ActionCard extends StatelessWidget {
           Text(
             data.label,
             textAlign: TextAlign.center,
-            style: AppTextStyles.label
-                .copyWith(color: AppColors.textPrimary),
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
           ),
         ],
       ),
-    );
+    )
+        .animate()
+        .shimmer(
+          delay: Duration.zero,
+          duration: 600.ms,
+          color: AppColors.primary.withAlpha(20),
+        );
   }
 }

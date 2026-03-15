@@ -9,6 +9,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/primary_button.dart';
+import '../../../../shared/widgets/success_overlay.dart';
 import '../providers/booking_provider.dart';
 
 class BookingConfirmSheet extends ConsumerStatefulWidget {
@@ -59,8 +60,15 @@ class _BookingConfirmSheetState extends ConsumerState<BookingConfirmSheet> {
           );
 
       if (!mounted) return;
-      Navigator.of(context).pop(true);
-      AppSnackbar.success(context, 'Session requested successfully!');
+      await showSuccessOverlay(
+        context,
+        assetPath: 'assets/lottie/lottie_success.json',
+        message: 'Session booked!',
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        AppSnackbar.success(context, 'Session requested successfully!');
+      }
     } catch (e) {
       HapticFeedback.heavyImpact();
       if (!mounted) return;

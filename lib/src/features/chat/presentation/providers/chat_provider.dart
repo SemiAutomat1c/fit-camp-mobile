@@ -1,4 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/convex_chat_repository.dart';
@@ -54,7 +55,7 @@ class MemberConversationNotifier extends _$MemberConversationNotifier {
 // ---------------------------------------------------------------------------
 
 @riverpod
-Future<List<Message>> messages(Ref ref, String conversationId) async {
+Future<List<Message>> messages(MessagesRef ref, String conversationId) async {
   final repo = ref.watch(chatRepositoryProvider);
   return repo.getMessages(conversationId);
 }
@@ -83,4 +84,21 @@ class PendingMessages extends _$PendingMessages {
             : m)
         .toList();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Unread message count — refreshed every 30 seconds
+// ---------------------------------------------------------------------------
+
+@riverpod
+Future<int> unreadChatCount(UnreadChatCountRef ref) async {
+  ref.keepAlive();
+
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(timer.cancel);
+
+  final repo = ref.read(chatRepositoryProvider);
+  return repo.getUnreadCount();
 }

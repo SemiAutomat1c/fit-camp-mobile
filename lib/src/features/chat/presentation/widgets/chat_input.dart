@@ -8,10 +8,19 @@ class ChatInput extends StatefulWidget {
     super.key,
     required this.onSend,
     this.enabled = true,
+    this.onPickImage,
+    this.onTextChanged,
   });
 
   final void Function(String content) onSend;
   final bool enabled;
+
+  /// Called when the user taps the image/camera icon.
+  /// When null, no icon button is shown.
+  final VoidCallback? onPickImage;
+
+  /// Called on every text change — used by parent to signal typing state.
+  final VoidCallback? onTextChanged;
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -32,6 +41,7 @@ class _ChatInputState extends State<ChatInput> {
 
   void _onTextChanged() {
     setState(() => _charCount = _controller.text.length);
+    widget.onTextChanged?.call();
   }
 
   void _handleSend() {
@@ -73,6 +83,22 @@ class _ChatInputState extends State<ChatInput> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // Camera / image picker icon — only shown when callback provided.
+              if (widget.onPickImage != null) ...[
+                IconButton(
+                  onPressed: widget.enabled ? widget.onPickImage : null,
+                  icon: Icon(
+                    Icons.image_outlined,
+                    color: widget.enabled
+                        ? AppColors.textMuted
+                        : AppColors.border,
+                  ),
+                  tooltip: 'Send image',
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+              ],
               Expanded(
                 child: TextField(
                   controller: _controller,
@@ -80,7 +106,12 @@ class _ChatInputState extends State<ChatInput> {
                   maxLines: 4,
                   minLines: 1,
                   maxLength: _maxChars,
-                  buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                  buildCounter: (
+                      _,
+                      {required currentLength,
+                      required isFocused,
+                      maxLength}) =>
+                      null,
                   style: AppTextStyles.body
                       .copyWith(color: AppColors.textPrimary),
                   cursorColor: AppColors.primary,
@@ -104,8 +135,8 @@ class _ChatInputState extends State<ChatInput> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.primary, width: 1),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1),
                     ),
                     disabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -133,8 +164,8 @@ class _ChatInputState extends State<ChatInput> {
               padding: const EdgeInsets.only(top: 4, right: 48),
               child: Text(
                 '$_charCount/$_maxChars',
-                style:
-                    AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textMuted),
               ),
             ),
         ],
